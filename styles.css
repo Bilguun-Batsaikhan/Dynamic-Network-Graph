@@ -97,3 +97,17 @@ circle.root {
 circle.child {
   stroke-width: 2px;
 }
+
+.label-halo {
+  fill: none;
+  stroke: #111;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.label-text {
+  fill: #e5e7eb;
+  font-size: 12px;
+  pointer-events: none;
+}

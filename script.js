@@ -1,6 +1,6 @@
 import { data } from "./data.js"; // This looks for ./data.js
 const rr = 10; // base radius for collapsed/leaf nodes
-const gap = 10; // spacing between siblings inside a parent
+const gap = 50; // spacing between siblings inside a parent
 const padding = 5; // extra padding between children and parent boundary
 const siblingPad = gap; // reuse your existing gap
 
@@ -173,7 +173,10 @@ function setup() {
     // IMPORTANT: convert local x/y into absolute positions for rendering
     computeAbsolutePositions(root, 0, 0);
   }
-
+  function shortLabel(d, max = 12) {
+    const s = d.node.name ?? d.node.id;
+    return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  }
   // ---- 3) Render with D3 joins + transitions ----
   function render(sceneG) {
     const visible = collectVisible(root, true);
@@ -200,11 +203,35 @@ function setup() {
       });
 
     nodesEnter.append("circle").attr("r", rr);
+    // background (halo)
     nodesEnter
       .append("text")
       .text((d) => d.node.name ?? d.node.id)
-      .attr("y", (d) => d.node.r + 14) // ⬅ label below the circle
-      .attr("text-anchor", "middle");
+      .text((d) => shortLabel(d))
+      .attr("y", (d) => d.node.r + 14)
+      .attr("text-anchor", "middle")
+      .style("font-size", (d) => {
+        switch (d.node.type) {
+          case "zone":
+            return "14px";
+          case "environment":
+            return "13px";
+          case "tier":
+            return "12px";
+          case "application":
+            return "11px";
+          default: // host
+            return "10px";
+        }
+      });
+
+    // foreground
+    // nodesEnter
+    //   .append("text")
+    //   .attr("class", "label-text")
+    //   .text((d) => d.node.name ?? d.node.id)
+    //   .attr("y", (d) => d.node.r + 14)
+    //   .attr("text-anchor", "middle");
 
     // UPDATE + ENTER merged
     const nodesMerge = nodesEnter.merge(nodesSel);
