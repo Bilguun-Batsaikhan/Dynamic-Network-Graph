@@ -1,37 +1,26 @@
+import { data } from "./data.js"; // This looks for ./data.js
 const rr = 10; // base radius for collapsed/leaf nodes
-const gap = 4; // spacing between siblings inside a parent
-const padding = 4; // extra padding between children and parent boundary
+const gap = 5; // spacing between siblings inside a parent
+const padding = 10; // extra padding between children and parent boundary
 
-// Build a sample 5-layer tree: each node has 2 children until leaf
-// You can change branching (n children) by editing makeChildren().
-function makeTree(depth, maxDepth, path = "root") {
-  const node = {
-    id: path,
+// Convert topology -> your node shape (id/expanded/children/r/x/y/absX/absY)
+function toNode(t, parentPath = "") {
+  const id = parentPath ? `${parentPath}/${t.name}` : t.name;
+  return {
+    id,
+    name: t.name,
+    type: t.type,
     expanded: false,
-    children: [],
-    r: rr, // computed radius
-    x: 0, // layout position relative to parent
+    children: (t.children ?? []).map((ch) => toNode(ch, id)),
+    r: rr,
+    x: 0,
     y: 0,
     absX: 0,
     absY: 0,
   };
-
-  if (depth < maxDepth) {
-    node.children = makeChildren(depth, maxDepth, path);
-  }
-
-  return node;
 }
 
-// Example: binary branching (2 children). Make it n-ary by returning more children.
-function makeChildren(depth, maxDepth, parentPath) {
-  return [
-    makeTree(depth + 1, maxDepth, `${parentPath}/c1`),
-    makeTree(depth + 1, maxDepth, `${parentPath}/c2`),
-  ];
-}
-
-const root = makeTree(0, 4); // 0..4 => 5 layers total
+const root = toNode(data);
 
 // ---------- D3 setup ----------
 const container = d3.select("#viz");
@@ -89,16 +78,13 @@ function setup() {
   }
 
   // ---- 1) Bottom-up radius computation ----
-  // Node radius rule:
-  // - collapsed OR no children -> rr
-  // - expanded -> big enough to contain immediate children laid out in a row
+  // expanded -> big enough to contain children on a ring (necklace)
   function computeRadius(node) {
     if (!node.children || node.children.length === 0) {
       node.r = rr;
       return node.r;
     }
 
-    // First compute children radii (children may be expanded)
     node.children.forEach(computeRadius);
 
     if (!node.expanded) {
@@ -106,45 +92,57 @@ function setup() {
       return node.r;
     }
 
-    // Layout children in a horizontal row: total width is sum of diameters + gaps
-    const diameters = node.children.map((c) => 2 * c.r);
-    const totalWidth =
-      diameters.reduce((a, b) => a + b, 0) +
-      gap * Math.max(0, node.children.length - 1);
+    const kids = node.children;
+    const n = kids.length;
 
-    // Parent must enclose row -> radius >= half row width, plus padding
-    // Also must be at least the biggest child radius + padding (just in case)
-    const halfRow = totalWidth / 2;
-    const biggest = Math.max(...node.children.map((c) => c.r));
+    const maxR = Math.max(...kids.map((c) => c.r));
+    const minGap = gap; // your existing spacing
 
-    node.r = Math.max(rr, halfRow + padding, biggest + padding);
+    if (n === 1) {
+      // one child just sits in the center; parent must contain it
+      node.r = Math.max(rr, maxR + padding);
+      return node.r;
+    }
+
+    // For a ring: neighbor center distance is 2*a*sin(pi/n)
+    // Need >= (r_i + r_j + gap). We approximate with 2*maxR + gap.
+    const a = (maxR + minGap / 2) / Math.sin(Math.PI / n);
+
+    // Parent radius must reach ring radius + child radius + padding
+    node.r = Math.max(rr, a + maxR + padding);
     return node.r;
   }
 
   // ---- 2) Top-down layout (positions inside each expanded node) ----
   // Places children circles along x-axis centered at 0, with no overlap.
+  // ---- 2) Top-down layout (positions inside each expanded node) ----
+  // Place children on a ring inside the parent (necklace)
   function layout(node) {
     if (!node.children || node.children.length === 0) return;
-
     if (!node.expanded) return;
 
     const kids = node.children;
+    const n = kids.length;
 
-    // totalWidth same as above
-    const diameters = kids.map((c) => 2 * c.r);
-    const totalWidth =
-      diameters.reduce((a, b) => a + b, 0) + gap * Math.max(0, kids.length - 1);
+    if (n === 1) {
+      kids[0].x = 0;
+      kids[0].y = 0;
+      layout(kids[0]);
+      return;
+    }
 
-    // Start x at left edge of the row (centered)
-    let x = -totalWidth / 2;
+    const maxR = Math.max(...kids.map((c) => c.r));
+
+    // Put centers on a ring that stays inside parent boundary
+    const ringR = Math.max(0, node.r - maxR - padding);
+
+    const step = (2 * Math.PI) / n;
 
     kids.forEach((c, i) => {
-      const w = 2 * c.r;
-      c.x = x + w / 2;
-      c.y = 0; // keep it simple: row inside parent
-      x += w + gap;
+      const ang = i * step;
+      c.x = ringR * Math.cos(ang);
+      c.y = ringR * Math.sin(ang);
 
-      // recurse
       layout(c);
     });
   }
@@ -188,6 +186,11 @@ function setup() {
       });
 
     nodesEnter.append("circle").attr("r", rr);
+    nodesEnter
+      .append("text")
+      .text((d) => d.node.name ?? d.node.id)
+      .attr("y", (d) => d.node.r + 14) // ⬅ label below the circle
+      .attr("text-anchor", "middle");
 
     // UPDATE + ENTER merged
     const nodesMerge = nodesEnter.merge(nodesSel);
@@ -203,6 +206,8 @@ function setup() {
       .duration(250)
       .attr("r", (d) => d.node.r)
       .attr("class", (d) => (d.node === root ? "root" : "child"));
+
+    nodesMerge.select("text").attr("y", (d) => d.node.r + 14);
 
     // EXIT
     nodesSel.exit().transition().duration(150).style("opacity", 0).remove();

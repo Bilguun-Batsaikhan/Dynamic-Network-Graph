@@ -57,11 +57,10 @@ svg {
 }
 
 .node text {
-  fill: var(--text);
-  font-size: 14px;
-  dominant-baseline: middle;
-  text-anchor: middle;
+  fill: #e5e7eb;
+  font-size: 12px;
   pointer-events: none;
+  user-select: none;
 }
 
 .hint {
