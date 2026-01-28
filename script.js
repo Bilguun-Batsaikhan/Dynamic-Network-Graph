@@ -220,6 +220,20 @@ function setup() {
       return cur; // can be null if something is truly missing
     }
 
+    function collectHosts(node, out = []) {
+      if (!node) return out;
+      if (node.type === "host") out.push(node);
+      if (node.children) node.children.forEach((c) => collectHosts(c, out));
+      return out;
+    }
+
+    // recursion cost is acceptable here since host count is limited, but in the future you
+    // might want to cache host lists on each node during the toNode() phase for efficiency
+    function hostIdsUnder(node) {
+      const ids = new Set();
+      collectHosts(node).forEach((h) => ids.add(h.id));
+      return ids;
+    }
     const visible = collectVisible(root, true);
     const visibleIds = new Set(visible.map((d) => d.node.id));
 
@@ -258,15 +272,15 @@ function setup() {
     }
     const resolvedLinks = links
       .map((l) => {
-        const s = nodeById.get(l.source);
-        const t = nodeById.get(l.target);
-        if (!s || !t) return null;
+        const sh = nodeById.get(l.source); // source host node
+        const th = nodeById.get(l.target); // target host node
+        if (!sh || !th) return null;
 
-        const sp = visibleProxy(s);
-        const tp = visibleProxy(t);
+        const sp = visibleProxy(sh); // visible proxy for drawing
+        const tp = visibleProxy(th);
         if (!sp || !tp) return null;
 
-        return { ...l, _sp: sp, _tp: tp };
+        return { ...l, _sh: sh, _th: th, _sp: sp, _tp: tp };
       })
       .filter(Boolean);
 
@@ -352,7 +366,7 @@ function setup() {
     const nodesMerge = nodesEnter.merge(nodesSel);
 
     nodesMerge
-      .on("mouseenter", (event, d) => highlight(d.node.id))
+      .on("mouseenter", (event, d) => highlightHostsInSubtree(d.node))
       .on("mouseleave", () => clearHighlight());
 
     nodesMerge
@@ -382,6 +396,84 @@ function setup() {
         .classed("dim", false)
         .classed("active", false)
         .classed("connected", false);
+    }
+
+    function clearHighlight() {
+      sceneG
+        .selectAll("line.link")
+        .classed("dim", false)
+        .classed("active", false);
+
+      sceneG
+        .selectAll("g.node")
+        .classed("dim", false)
+        .classed("active", false)
+        .classed("connected", false);
+    }
+
+    function highlightHostsInSubtree(hoveredNode) {
+      // 1) Which host ids live inside the hovered node?
+      const subtreeHostIds = hostIdsUnder(hoveredNode);
+
+      // If user hovers a node that contains no hosts, do nothing
+      if (subtreeHostIds.size === 0) {
+        clearHighlight();
+        return;
+      }
+
+      // 2) Dim everything first
+      const lines = sceneG.selectAll("line.link");
+      const nodes = sceneG.selectAll("g.node");
+
+      lines.classed("dim", true).classed("active", false);
+      nodes
+        .classed("dim", true)
+        .classed("active", false)
+        .classed("connected", false);
+
+      // 3) Activate only links where (source host OR target host) is in subtree
+      const showNodeIds = new Set(); // proxies to un-dim
+      let anyMatched = false;
+
+      lines.each(function (l) {
+        const shId = l._sh?.id ?? l.source; // true source host id
+        const thId = l._th?.id ?? l.target; // true target host id
+
+        const match = subtreeHostIds.has(shId) || subtreeHostIds.has(thId);
+        if (!match) return;
+
+        anyMatched = true;
+        d3.select(this).classed("dim", false).classed("active", true);
+
+        // Show the drawn endpoints (visible proxies)
+        if (l._sp?.id) showNodeIds.add(l._sp.id);
+        if (l._tp?.id) showNodeIds.add(l._tp.id);
+      });
+
+      // If hovered subtree has hosts but none are linked, do nothing
+      if (!anyMatched) {
+        clearHighlight();
+        return;
+      }
+
+      // 4) Un-dim only the proxy nodes that actually appear as endpoints
+      nodes.each(function (d) {
+        const id = d.node.id;
+        if (!showNodeIds.has(id)) return;
+
+        d3.select(this).classed("dim", false).classed("connected", true);
+      });
+
+      // 5) Optionally, mark hovered node as "active" ONLY if it is one of the endpoints
+      // (prevents random tiers/zones from lighting up)
+      nodes.each(function (d) {
+        if (d.node.id === hoveredNode.id && showNodeIds.has(d.node.id)) {
+          d3.select(this)
+            .classed("active", true)
+            .classed("connected", false)
+            .classed("dim", false);
+        }
+      });
     }
 
     function highlight(nodeId) {
