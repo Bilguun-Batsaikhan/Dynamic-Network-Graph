@@ -71,7 +71,7 @@ function setup() {
 
   const zoom = d3
     .zoom()
-    .scaleExtent([0.3, 6]) // min zoom, max zoom
+    .scaleExtent([0.03, 12]) // min zoom, max zoom
     .on("zoom", (event) => {
       viewport.attr("transform", event.transform);
     });
