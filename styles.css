@@ -80,3 +80,11 @@ svg {
   stroke-width: 2px;
   pointer-events: none; /* click goes to root */
 }
+
+circle.root {
+  stroke-width: 3px;
+}
+
+circle.child {
+  stroke-width: 2px;
+}
