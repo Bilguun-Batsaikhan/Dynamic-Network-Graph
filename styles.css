@@ -59,11 +59,45 @@ svg {
 svg:active {
   cursor: grabbing;
 }
-
+/* Node */
 .node circle {
-  fill: #60a5fa;
   stroke: #1f2937;
   stroke-width: 2px;
+}
+
+/* Layer fills (transparent feel) */
+.node.root circle {
+  fill: rgba(255, 255, 255, 0); /* invisible container */
+  stroke: rgba(255, 255, 255, 0); /* hide stroke too */
+}
+
+.node.zone circle {
+  fill: rgba(96, 165, 250, 0.22);
+  stroke: rgba(96, 165, 250, 0.9);
+  stroke-width: 3px;
+}
+
+.node.environment circle {
+  fill: rgba(52, 211, 153, 0.18);
+  stroke: rgba(52, 211, 153, 0.85);
+  stroke-width: 2.5px;
+}
+
+.node.tier circle {
+  fill: rgba(251, 191, 36, 0.16);
+  stroke: rgba(251, 191, 36, 0.8);
+}
+
+.node.application circle {
+  fill: rgba(167, 139, 250, 0.14);
+  stroke: rgba(167, 139, 250, 0.8);
+  stroke-dasharray: 5 3;
+}
+
+.node.host circle {
+  fill: rgba(229, 231, 235, 0.9);
+  stroke: rgba(15, 23, 42, 0.7);
+  stroke-width: 1.5px;
 }
 
 .node text {
@@ -71,6 +105,21 @@ svg:active {
   font-size: 12px;
   pointer-events: none;
   user-select: none;
+}
+
+.node.dim circle,
+.node.dim text {
+  opacity: 0.15;
+}
+
+.node.active circle {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 4px;
+}
+
+.node.connected circle {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 3px;
 }
 
 .hint {
@@ -128,18 +177,106 @@ circle.child {
   cursor: pointer;
 }
 
+/* Link */
+
 line.link {
-  stroke: rgba(255, 255, 255, 0.85);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
+  stroke-width: 2.5;
+  opacity: 0.55;
   pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 
+/* Internal link = subtle */
+line.link.internal {
+  stroke: rgba(229, 231, 235, 0.65);
+}
+
+/* Cross-zone = attention (dashed + warmer) */
 line.link.cross-zone {
+  stroke: rgba(251, 191, 36, 0.95);
   stroke-dasharray: 8 6;
-}
-
-line.link.cross-zone {
   stroke-dasharray: 6 4;
   stroke-width: 2px;
+  opacity: 0.85;
+}
+
+/* Hover states */
+line.link.dim {
+  opacity: 0.08;
+}
+
+line.link.active {
+  opacity: 1;
+  stroke-width: 4;
+}
+
+/* Legend styles */
+.legend {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  user-select: none;
+}
+
+.legend-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.legend-gap {
+  height: 8px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  display: inline-block;
+}
+
+.swatch.zone {
+  background: rgba(96, 165, 250, 0.22);
+  border-color: rgba(96, 165, 250, 0.9);
+}
+.swatch.environment {
+  background: rgba(52, 211, 153, 0.18);
+  border-color: rgba(52, 211, 153, 0.85);
+}
+.swatch.tier {
+  background: rgba(251, 191, 36, 0.16);
+  border-color: rgba(251, 191, 36, 0.8);
+}
+.swatch.application {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: rgba(167, 139, 250, 0.8);
+}
+.swatch.host {
+  background: rgba(229, 231, 235, 0.9);
+  border-color: rgba(15, 23, 42, 0.7);
+}
+
+.line {
+  width: 20px;
+  height: 0;
+  border-top: 3px solid rgba(255, 255, 255, 0.6);
+  display: inline-block;
+}
+
+.line.cross {
+  border-top-style: dashed;
+  border-top-color: rgba(251, 191, 36, 0.95);
 }

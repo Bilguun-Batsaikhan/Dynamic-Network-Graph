@@ -15,7 +15,32 @@
         <button id="resetView">Reset view</button>
       </div>
 
-      <div id="viz"></div>
+      <div id="viz">
+        <div class="legend" id="legend">
+          <div class="legend-title">Legend</div>
+
+          <div class="legend-row">
+            <span class="swatch zone"></span> Security Zone
+          </div>
+          <div class="legend-row">
+            <span class="swatch environment"></span> Environment
+          </div>
+          <div class="legend-row"><span class="swatch tier"></span> Tier</div>
+          <div class="legend-row">
+            <span class="swatch application"></span> Application
+          </div>
+          <div class="legend-row"><span class="swatch host"></span> Host</div>
+
+          <div class="legend-gap"></div>
+
+          <div class="legend-row">
+            <span class="line internal"></span> Internal link
+          </div>
+          <div class="legend-row">
+            <span class="line cross"></span> Cross-zone link
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- D3 v7 -->

@@ -297,7 +297,7 @@ function setup() {
     const nodesEnter = nodesSel
       .enter()
       .append("g")
-      .attr("class", "node")
+      .attr("class", (d) => `node ${d.node.type}`)
       .attr("transform", (d) => `translate(${d.node.absX}, ${d.node.absY})`)
       .style("cursor", "pointer")
       .on("click", (event, d) => {
@@ -352,6 +352,10 @@ function setup() {
     const nodesMerge = nodesEnter.merge(nodesSel);
 
     nodesMerge
+      .on("mouseenter", (event, d) => highlight(d.node.id))
+      .on("mouseleave", () => clearHighlight());
+
+    nodesMerge
       .transition()
       .duration(250)
       .attr("transform", (d) => `translate(${d.node.absX}, ${d.node.absY})`);
@@ -360,10 +364,65 @@ function setup() {
       .select("circle")
       .transition()
       .duration(250)
-      .attr("r", (d) => d.node.r)
-      .attr("class", (d) => (d.node === root ? "root" : "child"));
+      .attr("r", (d) => d.node.r);
+    nodesMerge.attr("class", (d) => `node ${d.node.type}`);
 
     nodesMerge.select("text").attr("y", (d) => d.node.r + 14);
+
+    function clearHighlight() {
+      // links
+      sceneG
+        .selectAll("line.link")
+        .classed("dim", false)
+        .classed("active", false);
+
+      // nodes
+      sceneG
+        .selectAll("g.node")
+        .classed("dim", false)
+        .classed("active", false)
+        .classed("connected", false);
+    }
+
+    function highlight(nodeId) {
+      const lines = sceneG.selectAll("line.link");
+
+      // First dim everything
+      lines.classed("dim", true).classed("active", false);
+      sceneG
+        .selectAll("g.node")
+        .classed("dim", true)
+        .classed("active", false)
+        .classed("connected", false);
+
+      // Figure out which links touch this node (IMPORTANT: uses rendered link datum)
+      const connectedNodeIds = new Set([nodeId]);
+
+      lines.each(function (l) {
+        // l must have endpoints (either direct nodes or your snapped proxies)
+        // Support both: l._sp/_tp (proxy nodes) OR l.source/l.target (ids)
+        const sid = l._sp?.id ?? l.source;
+        const tid = l._tp?.id ?? l.target;
+
+        if (sid === nodeId || tid === nodeId) {
+          connectedNodeIds.add(sid);
+          connectedNodeIds.add(tid);
+
+          d3.select(this).classed("dim", false).classed("active", true);
+        }
+      });
+
+      // Highlight hovered node + its neighbors
+      sceneG.selectAll("g.node").each(function (d) {
+        const id = d.node.id;
+        if (!connectedNodeIds.has(id)) return;
+
+        d3.select(this)
+          .classed("dim", false)
+          .classed("active", id === nodeId)
+          .classed("connected", id !== nodeId);
+      });
+    }
 
     // EXIT
     nodesSel.exit().transition().duration(150).style("opacity", 0).remove();
