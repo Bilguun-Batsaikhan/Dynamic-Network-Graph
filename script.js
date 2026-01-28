@@ -41,6 +41,7 @@ function toNode(t, parentPath = "") {
 }
 
 const root = toNode(data);
+root.expanded = true; // show all security zones immediately
 
 // ---------- D3 setup ----------
 const container = d3.select("#viz");
@@ -75,6 +76,23 @@ function setup() {
   // Initial compute + render
   recomputeAll();
   render(g);
+
+  // ========== EVENT HANDLERS (moved here) ==========
+  document.getElementById("collapseAll").onclick = () => {
+    collapseAll(root);
+    recomputeAll();
+    render(g);
+  };
+
+  document.getElementById("expandAll").onclick = () => {
+    expandAll(root);
+    recomputeAll();
+    render(g);
+  };
+
+  document.getElementById("resetView").onclick = () => {
+    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+  };
 
   // ---------- helpers ----------
   function computeAbsolutePositions(node, parentAbsX = 0, parentAbsY = 0) {
@@ -190,26 +208,30 @@ function setup() {
       .attr("transform", (d) => `translate(${d.node.absX}, ${d.node.absY})`)
       .style("cursor", "pointer")
       .on("click", (event, d) => {
-        // Prevent click bubbling so you can click deep nodes
         event.stopPropagation();
 
-        // Toggle only if it has children
+        // super-root is not interactive
+        if (d.node.type === "root") return;
+
         if (d.node.children && d.node.children.length > 0) {
           d.node.expanded = !d.node.expanded;
-
           recomputeAll();
           render(sceneG);
         }
       });
 
-    nodesEnter.append("circle").attr("r", rr);
+    nodesEnter
+      .append("circle")
+      .attr("r", (d) => (d.node.type === "root" ? 0 : rr))
+      .style("display", (d) => (d.node.type === "root" ? "none" : null));
+
     // background (halo)
     nodesEnter
       .append("text")
-      .text((d) => d.node.name ?? d.node.id)
       .text((d) => shortLabel(d))
       .attr("y", (d) => d.node.r + 14)
       .attr("text-anchor", "middle")
+      .style("display", (d) => (d.node.type === "root" ? "none" : null))
       .style("font-size", (d) => {
         switch (d.node.type) {
           case "zone":
@@ -220,7 +242,7 @@ function setup() {
             return "12px";
           case "application":
             return "11px";
-          default: // host
+          default:
             return "10px";
         }
       });
@@ -261,19 +283,48 @@ function setup() {
   //     render(g);
   //   });
   svg.on("click", (event) => {
-    // If the click came from a zoom/pan gesture, ignore it
     if (event.defaultPrevented) return;
-
-    collapseAll(root);
-    recomputeAll();
-    render(g);
   });
 
+  // this keeps expanded children states even after collapsing all
+  //   function collapseAll(node) {
+  //     node.expanded = false;
+  //     if (node.children) node.children.forEach(collapseAll);
+  //   }
   function collapseAll(node) {
+    // Root stays expanded forever
+    if (node.type === "root") {
+      node.expanded = true;
+      if (node.children) {
+        node.children.forEach(collapseAll);
+      }
+      return;
+    }
+
+    // Zones stay visible but collapse their internals
+    if (node.type === "zone") {
+      node.expanded = false;
+      if (node.children) {
+        node.children.forEach(collapseAll);
+      }
+      return;
+    }
+
+    // Everything below zones collapses normally
     node.expanded = false;
-    if (node.children) node.children.forEach(collapseAll);
+    if (node.children) {
+      node.children.forEach(collapseAll);
+    }
+  }
+
+  function expandAll(node) {
+    node.expanded = true;
+    if (node.children) {
+      node.children.forEach(expandAll);
+    }
   }
 }
 
 setup();
+
 window.addEventListener("resize", setup);

@@ -111,3 +111,19 @@ circle.child {
   font-size: 12px;
   pointer-events: none;
 }
+
+.controls {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+}
+
+.controls button {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
