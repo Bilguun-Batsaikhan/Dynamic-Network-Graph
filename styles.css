@@ -280,3 +280,35 @@ line.link.active {
   border-top-style: dashed;
   border-top-color: rgba(251, 191, 36, 0.95);
 }
+
+/* Label controls*/
+.label-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+}
+
+.label-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.label-controls select,
+.label-controls input[type="range"] {
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.label-controls input[type="range"] {
+  padding: 0;
+  height: 6px;
+}

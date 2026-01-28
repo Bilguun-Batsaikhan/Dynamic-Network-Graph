@@ -6,6 +6,22 @@ const padding = 5; // extra padding between children and parent boundary
 const siblingPad = gap; // reuse your existing gap
 let nodeById = new Map();
 
+const labelFontSizes = {
+  zone: 14,
+  environment: 13,
+  tier: 12,
+  application: 11,
+  host: 10,
+};
+
+const labelVisibility = {
+  zone: true,
+  environment: true,
+  tier: true,
+  application: true,
+  host: true,
+};
+
 function packWithPadding(circles, pad) {
   // Inflate radii so packing produces spacing.
   circles.forEach((c) => {
@@ -97,6 +113,66 @@ function setup() {
 
   document.getElementById("resetView").onclick = () => {
     svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+  };
+
+  // label controls for live font size adjustment
+  const labelTypeSelect = document.getElementById("labelType");
+  const labelSizeSlider = document.getElementById("labelSize");
+  const labelSizeValue = document.getElementById("labelSizeValue");
+
+  // Initialize slider with current value
+  labelSizeSlider.value = labelFontSizes[labelTypeSelect.value];
+  labelSizeValue.textContent = `${labelSizeSlider.value}px`;
+
+  // When label type changes → update slider
+  labelTypeSelect.onchange = () => {
+    const type = labelTypeSelect.value;
+    labelSizeSlider.value = labelFontSizes[type];
+    labelSizeValue.textContent = `${labelSizeSlider.value}px`;
+  };
+
+  // When slider moves → update font size live
+  labelSizeSlider.oninput = () => {
+    const type = labelTypeSelect.value;
+    const size = Number(labelSizeSlider.value);
+
+    labelFontSizes[type] = size;
+    labelSizeValue.textContent = `${size}px`;
+
+    // Update only labels (fast!)
+    d3.selectAll("g.node")
+      .filter((d) => d.node.type === type)
+      .select("text")
+      .style("font-size", `${size}px`);
+  };
+
+  const labelShowToggle = document.getElementById("labelShow");
+
+  // Initialize checkbox based on selected type
+  labelShowToggle.checked = labelVisibility[labelTypeSelect.value] !== false;
+
+  // When label type changes, update checkbox to match that type
+  labelTypeSelect.onchange = () => {
+    const type = labelTypeSelect.value;
+
+    labelSizeSlider.value = labelFontSizes[type];
+    labelSizeValue.textContent = `${labelSizeSlider.value}px`;
+
+    labelShowToggle.checked = labelVisibility[type] !== false;
+  };
+
+  // When checkbox toggled, show/hide labels of that type
+  labelShowToggle.onchange = () => {
+    const type = labelTypeSelect.value;
+    const show = labelShowToggle.checked;
+
+    labelVisibility[type] = show;
+
+    // Update only labels for that type (fast!)
+    d3.selectAll("g.node")
+      .filter((d) => d.node.type === type)
+      .select("text") // your label text element
+      .style("display", show ? null : "none");
   };
 
   // ---------- helpers ----------
@@ -330,7 +406,10 @@ function setup() {
     nodesEnter
       .append("circle")
       .attr("r", (d) => (d.node.type === "root" ? 0 : rr))
-      .style("display", (d) => (d.node.type === "root" ? "none" : null));
+      .style("display", (d) => {
+        if (d.node.type === "root") return "none";
+        return labelVisibility[d.node.type] === false ? "none" : null;
+      });
 
     // background (halo)
     nodesEnter
@@ -340,18 +419,8 @@ function setup() {
       .attr("text-anchor", "middle")
       .style("display", (d) => (d.node.type === "root" ? "none" : null))
       .style("font-size", (d) => {
-        switch (d.node.type) {
-          case "zone":
-            return "14px";
-          case "environment":
-            return "13px";
-          case "tier":
-            return "12px";
-          case "application":
-            return "11px";
-          default:
-            return "10px";
-        }
+        const t = d.node.type;
+        return `${labelFontSizes[t] ?? 10}px`;
       });
 
     // foreground

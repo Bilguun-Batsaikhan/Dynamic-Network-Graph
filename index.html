@@ -13,6 +13,36 @@
         <button id="collapseAll">Collapse all</button>
         <button id="expandAll">Expand all</button>
         <button id="resetView">Reset view</button>
+        <div class="label-controls">
+          <label>
+            Label type:
+            <select id="labelType">
+              <option value="zone">Security Zone</option>
+              <option value="environment">Environment</option>
+              <option value="tier">Tier</option>
+              <option value="application">Application</option>
+              <option value="host">Host</option>
+            </select>
+          </label>
+
+          <label>
+            Size:
+            <input
+              id="labelSize"
+              type="range"
+              min="8"
+              max="140"
+              step="1"
+              value="12"
+            />
+            <span id="labelSizeValue">12px</span>
+          </label>
+
+          <label>
+            Show labels:
+            <input id="labelShow" type="checkbox" checked />
+          </label>
+        </div>
       </div>
 
       <div id="viz">
