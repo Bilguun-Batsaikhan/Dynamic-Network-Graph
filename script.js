@@ -1,7 +1,27 @@
 import { data } from "./data.js"; // This looks for ./data.js
 const rr = 10; // base radius for collapsed/leaf nodes
 const gap = 5; // spacing between siblings inside a parent
-const padding = 10; // extra padding between children and parent boundary
+const padding = 5; // extra padding between children and parent boundary
+const siblingPad = gap; // reuse your existing gap
+
+function packWithPadding(circles, pad) {
+  // Inflate radii so packing produces spacing.
+  circles.forEach((c) => {
+    c.__r0 = c.r;
+    c.r = c.__r0 + pad / 2;
+  });
+
+  d3.packSiblings(circles);
+  const enclosing = d3.packEnclose(circles);
+
+  // Restore original radii (keep the packed x/y)
+  circles.forEach((c) => {
+    c.r = c.__r0;
+    delete c.__r0;
+  });
+
+  return enclosing; // NOTE: enclosing is based on inflated radii
+}
 
 // Convert topology -> your node shape (id/expanded/children/r/x/y/absX/absY)
 function toNode(t, parentPath = "") {
@@ -93,23 +113,12 @@ function setup() {
     }
 
     const kids = node.children;
-    const n = kids.length;
 
-    const maxR = Math.max(...kids.map((c) => c.r));
-    const minGap = gap; // your existing spacing
+    // pack using inflated radii so parent size accounts for spacing
+    const enclosing = packWithPadding(kids, siblingPad);
 
-    if (n === 1) {
-      // one child just sits in the center; parent must contain it
-      node.r = Math.max(rr, maxR + padding);
-      return node.r;
-    }
-
-    // For a ring: neighbor center distance is 2*a*sin(pi/n)
-    // Need >= (r_i + r_j + gap). We approximate with 2*maxR + gap.
-    const a = (maxR + minGap / 2) / Math.sin(Math.PI / n);
-
-    // Parent radius must reach ring radius + child radius + padding
-    node.r = Math.max(rr, a + maxR + padding);
+    // enclosing.r already includes padding effect; add your outer padding too
+    node.r = Math.max(rr, enclosing.r + padding);
     return node.r;
   }
 
@@ -122,29 +131,20 @@ function setup() {
     if (!node.expanded) return;
 
     const kids = node.children;
-    const n = kids.length;
 
-    if (n === 1) {
-      kids[0].x = 0;
-      kids[0].y = 0;
-      layout(kids[0]);
-      return;
-    }
+    // packed positions computed with padding
+    const enclosing = packWithPadding(kids, siblingPad);
 
-    const maxR = Math.max(...kids.map((c) => c.r));
+    // Fit the packed cluster inside the parent
+    const targetR = Math.max(0, node.r - padding);
+    const scale = enclosing.r > 0 ? targetR / enclosing.r : 1;
 
-    // Put centers on a ring that stays inside parent boundary
-    const ringR = Math.max(0, node.r - maxR - padding);
-
-    const step = (2 * Math.PI) / n;
-
-    kids.forEach((c, i) => {
-      const ang = i * step;
-      c.x = ringR * Math.cos(ang);
-      c.y = ringR * Math.sin(ang);
-
-      layout(c);
+    kids.forEach((c) => {
+      c.x = (c.x - enclosing.x) * scale;
+      c.y = (c.y - enclosing.y) * scale;
     });
+
+    kids.forEach(layout);
   }
 
   function recomputeAll() {
