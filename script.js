@@ -1,6 +1,6 @@
 import { data } from "./data.js"; // This looks for ./data.js
 const rr = 10; // base radius for collapsed/leaf nodes
-const gap = 5; // spacing between siblings inside a parent
+const gap = 10; // spacing between siblings inside a parent
 const padding = 5; // extra padding between children and parent boundary
 const siblingPad = gap; // reuse your existing gap
 
@@ -54,9 +54,23 @@ function setup() {
     .attr("viewBox", `0 0 ${width} ${height}`)
     .attr("preserveAspectRatio", "xMidYMid meet");
 
-  const g = svg
+  // A zoomable viewport (camera)
+  const viewport = svg.append("g").attr("class", "viewport");
+
+  // Your scene stays centered inside the viewport
+  const g = viewport
     .append("g")
+    .attr("class", "scene")
     .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+  const zoom = d3
+    .zoom()
+    .scaleExtent([0.3, 6]) // min zoom, max zoom
+    .on("zoom", (event) => {
+      viewport.attr("transform", event.transform);
+    });
+
+  svg.call(zoom).on("dblclick.zoom", null);
 
   // Initial compute + render
   recomputeAll();
@@ -214,7 +228,15 @@ function setup() {
   }
 
   // Optional: click empty space to collapse everything
-  svg.on("click", () => {
+  //   svg.on("click", () => {
+  //     collapseAll(root);
+  //     recomputeAll();
+  //     render(g);
+  //   });
+  svg.on("click", (event) => {
+    // If the click came from a zoom/pan gesture, ignore it
+    if (event.defaultPrevented) return;
+
     collapseAll(root);
     recomputeAll();
     render(g);
