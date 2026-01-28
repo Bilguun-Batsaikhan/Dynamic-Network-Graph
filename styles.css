@@ -127,3 +127,19 @@ circle.child {
   padding: 6px 10px;
   cursor: pointer;
 }
+
+line.link {
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+line.link.cross-zone {
+  stroke-dasharray: 8 6;
+}
+
+line.link.cross-zone {
+  stroke-dasharray: 6 4;
+  stroke-width: 2px;
+}

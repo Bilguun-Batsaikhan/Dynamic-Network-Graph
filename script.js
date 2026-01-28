@@ -1,8 +1,10 @@
 import { data } from "./data.js"; // This looks for ./data.js
+import { links } from "./links.js"; // This looks for ./links.js
 const rr = 10; // base radius for collapsed/leaf nodes
-const gap = 50; // spacing between siblings inside a parent
+const gap = 100; // spacing between siblings inside a parent
 const padding = 5; // extra padding between children and parent boundary
 const siblingPad = gap; // reuse your existing gap
+let nodeById = new Map();
 
 function packWithPadding(circles, pad) {
   // Inflate radii so packing produces spacing.
@@ -24,20 +26,23 @@ function packWithPadding(circles, pad) {
 }
 
 // Convert topology -> your node shape (id/expanded/children/r/x/y/absX/absY)
-function toNode(t, parentPath = "") {
+function toNode(t, parentPath = "", parent = null) {
   const id = parentPath ? `${parentPath}/${t.name}` : t.name;
-  return {
+  const node = {
     id,
     name: t.name,
     type: t.type,
     expanded: false,
-    children: (t.children ?? []).map((ch) => toNode(ch, id)),
+    children: [],
+    parent, // ✅ add this
     r: rr,
     x: 0,
     y: 0,
     absX: 0,
     absY: 0,
   };
+  node.children = (t.children ?? []).map((ch) => toNode(ch, id, node));
+  return node;
 }
 
 const root = toNode(data);
@@ -104,6 +109,12 @@ function setup() {
         computeAbsolutePositions(c, node.absX, node.absY),
       );
     }
+  }
+
+  function indexAllNodes(node, map = new Map()) {
+    map.set(node.id, node);
+    if (node.children) node.children.forEach((c) => indexAllNodes(c, map));
+    return map;
   }
 
   function isVisible(node, ancestorsExpanded) {
@@ -190,16 +201,98 @@ function setup() {
 
     // IMPORTANT: convert local x/y into absolute positions for rendering
     computeAbsolutePositions(root, 0, 0);
+
+    nodeById = indexAllNodes(root); // keep it current
   }
-  function shortLabel(d, max = 12) {
+
+  //   let nodeById = indexAllNodes(root);
+
+  function shortLabel(d, max = 15) {
     const s = d.node.name ?? d.node.id;
     return s.length > max ? s.slice(0, max - 1) + "…" : s;
   }
   // ---- 3) Render with D3 joins + transitions ----
   function render(sceneG) {
-    const visible = collectVisible(root, true);
+    // helper
+    function visibleProxy(node) {
+      let cur = node;
+      while (cur && !visibleIds.has(cur.id)) cur = cur.parent;
+      return cur; // can be null if something is truly missing
+    }
 
-    const nodesSel = sceneG.selectAll("g.node").data(visible, (d) => d.node.id);
+    const visible = collectVisible(root, true);
+    const visibleIds = new Set(visible.map((d) => d.node.id));
+
+    const visibleLinks = links.filter(
+      (l) => nodeById.has(l.source) && nodeById.has(l.target),
+    );
+    const nodesLayer = sceneG
+      .selectAll("g.nodes")
+      .data([null])
+      .join("g")
+      .attr("class", "nodes");
+    const linksLayer = sceneG
+      .selectAll("g.links")
+      .data([null])
+      .join("g")
+      .attr("class", "links");
+    const labelsLayer = sceneG
+      .selectAll("g.labels")
+      .data([null])
+      .join("g")
+      .attr("class", "labels");
+
+    // DEBUG: check how many link endpoints resolve
+    const unresolved = (typeof links === "undefined" ? [] : links).filter(
+      (l) => !nodeById.has(l.source) || !nodeById.has(l.target),
+    );
+
+    if (unresolved.length) {
+      console.warn("Unresolved links:", unresolved);
+      console.warn(
+        "Example known ids:",
+        Array.from(nodeById.keys()).slice(0, 20),
+      );
+    } else {
+      console.log("All links resolved:", links.length);
+    }
+    const resolvedLinks = links
+      .map((l) => {
+        const s = nodeById.get(l.source);
+        const t = nodeById.get(l.target);
+        if (!s || !t) return null;
+
+        const sp = visibleProxy(s);
+        const tp = visibleProxy(t);
+        if (!sp || !tp) return null;
+
+        return { ...l, _sp: sp, _tp: tp };
+      })
+      .filter(Boolean);
+
+    const linksSel = linksLayer
+      .selectAll("line.link")
+      .data(resolvedLinks, (d) => d.id);
+
+    linksSel
+      .enter()
+      .append("line")
+      .attr("class", (d) => `link ${d.kind}`)
+      .merge(linksSel)
+      .transition()
+      .duration(250)
+      .attr("x1", (d) => d._sp.absX)
+      .attr("y1", (d) => d._sp.absY)
+      .attr("x2", (d) => d._tp.absX)
+      .attr("y2", (d) => d._tp.absY);
+
+    linksSel.exit().remove();
+
+    linksSel.exit().remove();
+
+    const nodesSel = nodesLayer
+      .selectAll("g.node")
+      .data(visible, (d) => d.node.id);
 
     const nodesEnter = nodesSel
       .enter()
