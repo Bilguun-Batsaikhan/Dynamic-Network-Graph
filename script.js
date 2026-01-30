@@ -406,10 +406,7 @@ function setup() {
     nodesEnter
       .append("circle")
       .attr("r", (d) => (d.node.type === "root" ? 0 : rr))
-      .style("display", (d) => {
-        if (d.node.type === "root") return "none";
-        return labelVisibility[d.node.type] === false ? "none" : null;
-      });
+      .style("display", (d) => (d.node.type === "root" ? "none" : null));
 
     // background (halo)
     nodesEnter
