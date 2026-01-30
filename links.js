@@ -1,58 +1,65 @@
 // links.js
-export const links = [
-  // SZ-1 internal: web -> db
-  {
-    id: "sz1_web1_to_db1",
-    source: "Root/SZ-1/Production/Web/web-app-1/prod-web-app-1-host-1",
-    target: "Root/SZ-1/Production/Database/db-cluster-1/prod-db-1-host-1",
-    kind: "internal",
-  },
+// Generates ~1600 arcs, internal + cross-zone
 
-  {
-    id: "sz1_app1_to_db2",
-    source: "Root/SZ-1/Production/Application/app-service-1/prod-app-1-host-1",
-    target: "Root/SZ-1/Production/Database/db-cluster-2/prod-db-2-host-2",
-    kind: "internal",
-  },
+import data from "./data.js";
 
-  // SZ-2 internal: web -> db
-  {
-    id: "sz2_web3_to_db1",
-    source: "Root/SZ-2/Production/Web/web-app-3/prod-web-app-3-sz2-host-2",
-    target: "Root/SZ-2/Production/Database/db-cluster-1/prod-db-1-sz2-host-1",
-    kind: "internal",
-  },
+function assignIds(node, parentPath = "") {
+  const id = parentPath ? `${parentPath}/${node.name}` : node.name;
+  node.__id = id;
+  if (node.children) node.children.forEach((c) => assignIds(c, id));
+}
 
-  {
-    id: "sz2_app2_to_app1",
-    source:
-      "Root/SZ-2/Production/Application/app-service-2/prod-app-2-sz2-host-1",
-    target:
-      "Root/SZ-2/Production/Application/app-service-1/prod-app-1-sz2-host-3",
-    kind: "internal",
-  },
+function collectHosts(node, zone = null, env = null, out = []) {
+  if (node.type === "zone") zone = node.name;
+  if (node.type === "environment") env = node.name;
 
-  // Cross-zone links (SZ-1 -> SZ-2)
-  {
-    id: "cross_sz1_web1_to_sz2_app1",
-    source: "Root/SZ-1/Production/Web/web-app-1/prod-web-app-1-host-2",
-    target:
-      "Root/SZ-2/Production/Application/app-service-1/prod-app-1-sz2-host-1",
+  if (node.type === "host") {
+    out.push({ id: node.__id, zone, env });
+  }
+
+  if (node.children) {
+    node.children.forEach((c) => collectHosts(c, zone, env, out));
+  }
+  return out;
+}
+
+assignIds(data);
+const hosts = collectHosts(data);
+
+function rand(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+const links = [];
+let id = 0;
+
+// INTERNAL LINKS (dense)
+for (let i = 0; i < 1200; i++) {
+  const a = rand(hosts);
+  const b = rand(hosts.filter((h) => h.zone === a.zone && h.id !== a.id));
+  if (!a || !b) continue;
+
+  links.push({
+    id: `l_${id++}`,
+    source: a.id,
+    target: b.id,
+    kind: "internal",
+  });
+}
+
+// CROSS-ZONE LINKS (mostly prod)
+for (let i = 0; i < 400; i++) {
+  const a = rand(hosts.filter((h) => h.env === "Production"));
+  const b = rand(hosts.filter((h) => h.zone !== a.zone));
+  if (!a || !b) continue;
+
+  links.push({
+    id: `l_${id++}`,
+    source: a.id,
+    target: b.id,
     kind: "cross-zone",
-  },
+  });
+}
 
-  {
-    id: "cross_sz1_db1_to_sz2_db2",
-    source: "Root/SZ-1/Production/Database/db-cluster-1/prod-db-1-host-3",
-    target: "Root/SZ-2/Production/Database/db-cluster-2/prod-db-2-sz2-host-4",
-    kind: "cross-zone",
-  },
-
-  // Cross-zone (SZ-2 -> SZ-1)
-  {
-    id: "cross_sz2_web2_to_sz1_app3",
-    source: "Root/SZ-2/Production/Web/web-app-2/prod-web-app-2-sz2-host-1",
-    target: "Root/SZ-1/Production/Application/app-service-3/prod-app-3-host-2",
-    kind: "cross-zone",
-  },
-];
+export { links };
+export default links;
