@@ -72,8 +72,8 @@ svg:active {
 }
 
 .node.zone circle {
-  fill: rgba(96, 165, 250, 0.22);
-  stroke: rgba(96, 165, 250, 0.9);
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: rgba(255, 255, 255, 0.35);
   stroke-width: 3px;
 }
 
@@ -180,7 +180,7 @@ circle.child {
 /* Link */
 
 line.link {
-  stroke-width: 2.5;
+  stroke-width: 1;
   opacity: 0.55;
   pointer-events: none;
   vector-effect: non-scaling-stroke;
@@ -196,7 +196,7 @@ line.link.cross-zone {
   stroke: rgba(251, 191, 36, 0.95);
   stroke-dasharray: 8 6;
   stroke-dasharray: 6 4;
-  stroke-width: 2px;
+  stroke-width: 1x;
   opacity: 0.85;
 }
 
@@ -207,7 +207,7 @@ line.link.dim {
 
 line.link.active {
   opacity: 1;
-  stroke-width: 4;
+  stroke-width: 1;
 }
 
 /* Legend styles */

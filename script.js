@@ -7,7 +7,6 @@ const siblingPad = gap; // reuse your existing gap
 const SHOW_LINKS_ONLY_ON_HOVER = true;
 const MAX_HOVER_LINKS = 300; // cap to keep it snappy (tweak: 150..800)
 let linkEndpoints = []; // cached [{...link, _sh, _th}]
-
 let nodeById = new Map();
 
 const labelFontSizes = {
@@ -25,6 +24,56 @@ const labelVisibility = {
   application: true,
   host: true,
 };
+
+// --- Per-security-zone colors (NO red) ---
+const zonePalette = [
+  {
+    zone: "Internet",
+    fill: "rgba(239, 68, 68, 0.20)",
+    stroke: "rgba(239, 68, 68, 1.0)",
+  }, // Red
+  {
+    zone: "DMZ",
+    fill: "rgba(249, 115, 22, 0.18)",
+    stroke: "rgba(249, 115, 22, 1.0)",
+  }, // Orange
+  {
+    zone: "TPI",
+    fill: "rgba(253, 224, 71, 0.18)",
+    stroke: "rgba(234, 179, 8, 1.0)",
+  }, // Yellow
+  {
+    zone: "ISZ",
+    fill: "rgba(34, 197, 94, 0.16)",
+    stroke: "rgba(34, 197, 94, 1.0)",
+  }, // Green
+  {
+    zone: "Margherita",
+    fill: "rgba(186, 230, 253, 0.25)",
+    stroke: "rgba(14, 165, 233, 0.9)",
+  }, // Light Blue
+  {
+    zone: "Private Cloud",
+    fill: "rgba(30, 58, 138, 0.15)",
+    stroke: "rgba(30, 58, 138, 1.0)",
+  }, // Dark Blue
+  {
+    zone: "Public Cloud",
+    fill: "rgba(224, 242, 254, 0.30)",
+    stroke: "rgba(125, 211, 252, 0.8)",
+  }, // Very Light Blue
+];
+
+const zoneColorByName = new Map();
+function initZoneColors() {
+  // root.children are the zones (SZ-1, SZ-2, ...)
+  (root.children ?? []).forEach((z, i) => {
+    zoneColorByName.set(z.name, zonePalette[i % zonePalette.length]);
+  });
+}
+function zoneColor(name) {
+  return zoneColorByName.get(name) ?? zonePalette[0];
+}
 
 function packWithPadding(circles, pad) {
   // Inflate radii so packing produces spacing.
@@ -103,6 +152,7 @@ function buildHostCaches(node) {
 
 const root = toNode(data);
 root.expanded = true; // show all security zones immediately
+initZoneColors();
 buildHostCaches(root);
 
 // ---------- D3 setup ----------
@@ -530,6 +580,21 @@ function setup() {
       .transition()
       .duration(250)
       .attr("transform", (d) => `translate(${d.node.absX}, ${d.node.absY})`);
+
+    // Apply per-zone colors only to zone circles (others keep CSS styling)
+    nodesMerge
+      .filter((d) => d.node.type === "zone")
+      .select("circle")
+      .style("fill", (d) => zoneColor(d.node.name).fill)
+      .style("stroke", (d) => zoneColor(d.node.name).stroke)
+      .style("stroke-width", 3);
+
+    nodesMerge
+      .filter((d) => d.node.type !== "zone")
+      .select("circle")
+      .style("fill", null)
+      .style("stroke", null)
+      .style("stroke-width", null);
 
     nodesMerge
       .select("circle")

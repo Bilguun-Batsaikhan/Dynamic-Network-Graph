@@ -39,7 +39,15 @@ function makeEnvironment(name, appCount) {
 export const data = {
   name: "Root",
   type: "root",
-  children: ["SZ-1", "SZ-2"].map((sz) => ({
+  children: [
+    "SZ-Internet",
+    "SZ-DMZ",
+    "TPI",
+    "ISZ",
+    "Margherita",
+    "Private Cloud",
+    "Public Cloud",
+  ].map((sz) => ({
     name: sz,
     type: "zone",
     children: [
