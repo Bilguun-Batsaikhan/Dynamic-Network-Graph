@@ -4,6 +4,9 @@ const rr = 10; // base radius for collapsed/leaf nodes
 const gap = 100; // spacing between siblings inside a parent
 const padding = 5; // extra padding between children and parent boundary
 const siblingPad = gap; // reuse your existing gap
+const SHOW_LINKS_ONLY_ON_HOVER = true;
+const MAX_HOVER_LINKS = 300; // cap to keep it snappy (tweak: 150..800)
+
 let nodeById = new Map();
 
 const labelFontSizes = {
@@ -289,11 +292,28 @@ function setup() {
   }
   // ---- 3) Render with D3 joins + transitions ----
   function render(sceneG) {
-    // helper
+    // ---- collect visible nodes ----
+    const visible = collectVisible(root, true);
+    const visibleIds = new Set(visible.map((d) => d.node.id));
+
+    // ---- layers (create once via join) ----
+    const linksLayer = sceneG
+      .selectAll("g.links")
+      .data([null])
+      .join("g")
+      .attr("class", "links");
+
+    const nodesLayer = sceneG
+      .selectAll("g.nodes")
+      .data([null])
+      .join("g")
+      .attr("class", "nodes");
+
+    // ---- helpers ----
     function visibleProxy(node) {
       let cur = node;
       while (cur && !visibleIds.has(cur.id)) cur = cur.parent;
-      return cur; // can be null if something is truly missing
+      return cur;
     }
 
     function collectHosts(node, out = []) {
@@ -303,83 +323,140 @@ function setup() {
       return out;
     }
 
-    // recursion cost is acceptable here since host count is limited, but in the future you
-    // might want to cache host lists on each node during the toNode() phase for efficiency
     function hostIdsUnder(node) {
       const ids = new Set();
       collectHosts(node).forEach((h) => ids.add(h.id));
       return ids;
     }
-    const visible = collectVisible(root, true);
-    const visibleIds = new Set(visible.map((d) => d.node.id));
 
-    const visibleLinks = links.filter(
-      (l) => nodeById.has(l.source) && nodeById.has(l.target),
-    );
-    const nodesLayer = sceneG
-      .selectAll("g.nodes")
-      .data([null])
-      .join("g")
-      .attr("class", "nodes");
-    const linksLayer = sceneG
-      .selectAll("g.links")
-      .data([null])
-      .join("g")
-      .attr("class", "links");
-    const labelsLayer = sceneG
-      .selectAll("g.labels")
-      .data([null])
-      .join("g")
-      .attr("class", "labels");
+    function computeResolvedLinksForHosts(hostIdSet) {
+      if (!hostIdSet || hostIdSet.size === 0) return [];
 
-    // DEBUG: check how many link endpoints resolve
-    const unresolved = (typeof links === "undefined" ? [] : links).filter(
-      (l) => !nodeById.has(l.source) || !nodeById.has(l.target),
-    );
-
-    if (unresolved.length) {
-      console.warn("Unresolved links:", unresolved);
-      console.warn(
-        "Example known ids:",
-        Array.from(nodeById.keys()).slice(0, 20),
+      // Filter FIRST (fast)
+      const filtered = links.filter(
+        (l) => hostIdSet.has(l.source) || hostIdSet.has(l.target),
       );
-    } else {
-      console.log("All links resolved:", links.length);
+
+      // Cap to avoid DOM spikes
+      const capped =
+        filtered.length > MAX_HOVER_LINKS
+          ? filtered.slice(0, MAX_HOVER_LINKS)
+          : filtered;
+
+      // Resolve endpoints + snap to visible proxies
+      return capped
+        .map((l) => {
+          const sh = nodeById.get(l.source);
+          const th = nodeById.get(l.target);
+          if (!sh || !th) return null;
+
+          const sp = visibleProxy(sh);
+          const tp = visibleProxy(th);
+          if (!sp || !tp) return null;
+
+          return { ...l, _sh: sh, _th: th, _sp: sp, _tp: tp };
+        })
+        .filter(Boolean);
     }
-    const resolvedLinks = links
-      .map((l) => {
-        const sh = nodeById.get(l.source); // source host node
-        const th = nodeById.get(l.target); // target host node
-        if (!sh || !th) return null;
 
-        const sp = visibleProxy(sh); // visible proxy for drawing
-        const tp = visibleProxy(th);
-        if (!sp || !tp) return null;
+    function drawLinks(resolvedLinks) {
+      const linksSel = linksLayer
+        .selectAll("line.link")
+        .data(resolvedLinks, (d) => d.id);
 
-        return { ...l, _sh: sh, _th: th, _sp: sp, _tp: tp };
-      })
-      .filter(Boolean);
+      linksSel
+        .enter()
+        .append("line")
+        .attr("class", (d) => `link ${d.kind}`)
+        .merge(linksSel)
+        // no transitions on hover = snappy
+        .attr("x1", (d) => d._sp.absX)
+        .attr("y1", (d) => d._sp.absY)
+        .attr("x2", (d) => d._tp.absX)
+        .attr("y2", (d) => d._tp.absY);
 
-    const linksSel = linksLayer
-      .selectAll("line.link")
-      .data(resolvedLinks, (d) => d.id);
+      linksSel.exit().remove();
+    }
 
-    linksSel
-      .enter()
-      .append("line")
-      .attr("class", (d) => `link ${d.kind}`)
-      .merge(linksSel)
-      .transition()
-      .duration(250)
-      .attr("x1", (d) => d._sp.absX)
-      .attr("y1", (d) => d._sp.absY)
-      .attr("x2", (d) => d._tp.absX)
-      .attr("y2", (d) => d._tp.absY);
+    function clearLinks() {
+      linksLayer.selectAll("line.link").remove();
+    }
 
-    linksSel.exit().remove();
+    function clearHighlight() {
+      if (SHOW_LINKS_ONLY_ON_HOVER) clearLinks();
 
-    linksSel.exit().remove();
+      // reset node styles
+      sceneG
+        .selectAll("g.node")
+        .classed("dim", false)
+        .classed("active", false)
+        .classed("connected", false);
+    }
 
+    function highlightHostsInSubtree(hoveredNode) {
+      const subtreeHostIds = hostIdsUnder(hoveredNode);
+
+      // If subtree has no hosts, clear and bail
+      if (subtreeHostIds.size === 0) {
+        clearHighlight();
+        return;
+      }
+
+      // 1) Draw only relevant links (or nothing)
+      if (SHOW_LINKS_ONLY_ON_HOVER) {
+        const resolved = computeResolvedLinksForHosts(subtreeHostIds);
+        drawLinks(resolved);
+      }
+
+      // 2) Dim everything first
+      const lines = sceneG.selectAll("line.link");
+      const nodes = sceneG.selectAll("g.node");
+
+      lines.classed("dim", true).classed("active", false);
+      nodes
+        .classed("dim", true)
+        .classed("active", false)
+        .classed("connected", false);
+
+      // 3) Undim only endpoints of the *drawn* links that touch the subtree
+      const showNodeIds = new Set();
+      let anyMatched = false;
+
+      lines.each(function (l) {
+        const shId = l._sh?.id ?? l.source;
+        const thId = l._th?.id ?? l.target;
+
+        const match = subtreeHostIds.has(shId) || subtreeHostIds.has(thId);
+        if (!match) return;
+
+        anyMatched = true;
+        d3.select(this).classed("dim", false).classed("active", true);
+
+        if (l._sp?.id) showNodeIds.add(l._sp.id);
+        if (l._tp?.id) showNodeIds.add(l._tp.id);
+      });
+
+      if (!anyMatched) {
+        clearHighlight();
+        return;
+      }
+
+      nodes.each(function (d) {
+        const id = d.node.id;
+        if (!showNodeIds.has(id)) return;
+
+        d3.select(this).classed("dim", false).classed("connected", true);
+      });
+
+      // mark hovered node as active (optional)
+      nodes.each(function (d) {
+        if (d.node.id === hoveredNode.id) {
+          d3.select(this).classed("active", true).classed("dim", false);
+        }
+      });
+    }
+
+    // ---- NODES join ----
     const nodesSel = nodesLayer
       .selectAll("g.node")
       .data(visible, (d) => d.node.id);
@@ -392,8 +469,6 @@ function setup() {
       .style("cursor", "pointer")
       .on("click", (event, d) => {
         event.stopPropagation();
-
-        // super-root is not interactive
         if (d.node.type === "root") return;
 
         if (d.node.children && d.node.children.length > 0) {
@@ -408,7 +483,6 @@ function setup() {
       .attr("r", (d) => (d.node.type === "root" ? 0 : rr))
       .style("display", (d) => (d.node.type === "root" ? "none" : null));
 
-    // background (halo)
     nodesEnter
       .append("text")
       .text((d) => shortLabel(d))
@@ -420,15 +494,6 @@ function setup() {
         return `${labelFontSizes[t] ?? 10}px`;
       });
 
-    // foreground
-    // nodesEnter
-    //   .append("text")
-    //   .attr("class", "label-text")
-    //   .text((d) => d.node.name ?? d.node.id)
-    //   .attr("y", (d) => d.node.r + 14)
-    //   .attr("text-anchor", "middle");
-
-    // UPDATE + ENTER merged
     const nodesMerge = nodesEnter.merge(nodesSel);
 
     nodesMerge
@@ -445,145 +510,14 @@ function setup() {
       .transition()
       .duration(250)
       .attr("r", (d) => d.node.r);
-    nodesMerge.attr("class", (d) => `node ${d.node.type}`);
 
+    nodesMerge.attr("class", (d) => `node ${d.node.type}`);
     nodesMerge.select("text").attr("y", (d) => d.node.r + 14);
 
-    function clearHighlight() {
-      // links
-      sceneG
-        .selectAll("line.link")
-        .classed("dim", false)
-        .classed("active", false);
-
-      // nodes
-      sceneG
-        .selectAll("g.node")
-        .classed("dim", false)
-        .classed("active", false)
-        .classed("connected", false);
-    }
-
-    function clearHighlight() {
-      sceneG
-        .selectAll("line.link")
-        .classed("dim", false)
-        .classed("active", false);
-
-      sceneG
-        .selectAll("g.node")
-        .classed("dim", false)
-        .classed("active", false)
-        .classed("connected", false);
-    }
-
-    function highlightHostsInSubtree(hoveredNode) {
-      // 1) Which host ids live inside the hovered node?
-      const subtreeHostIds = hostIdsUnder(hoveredNode);
-
-      // If user hovers a node that contains no hosts, do nothing
-      if (subtreeHostIds.size === 0) {
-        clearHighlight();
-        return;
-      }
-
-      // 2) Dim everything first
-      const lines = sceneG.selectAll("line.link");
-      const nodes = sceneG.selectAll("g.node");
-
-      lines.classed("dim", true).classed("active", false);
-      nodes
-        .classed("dim", true)
-        .classed("active", false)
-        .classed("connected", false);
-
-      // 3) Activate only links where (source host OR target host) is in subtree
-      const showNodeIds = new Set(); // proxies to un-dim
-      let anyMatched = false;
-
-      lines.each(function (l) {
-        const shId = l._sh?.id ?? l.source; // true source host id
-        const thId = l._th?.id ?? l.target; // true target host id
-
-        const match = subtreeHostIds.has(shId) || subtreeHostIds.has(thId);
-        if (!match) return;
-
-        anyMatched = true;
-        d3.select(this).classed("dim", false).classed("active", true);
-
-        // Show the drawn endpoints (visible proxies)
-        if (l._sp?.id) showNodeIds.add(l._sp.id);
-        if (l._tp?.id) showNodeIds.add(l._tp.id);
-      });
-
-      // If hovered subtree has hosts but none are linked, do nothing
-      if (!anyMatched) {
-        clearHighlight();
-        return;
-      }
-
-      // 4) Un-dim only the proxy nodes that actually appear as endpoints
-      nodes.each(function (d) {
-        const id = d.node.id;
-        if (!showNodeIds.has(id)) return;
-
-        d3.select(this).classed("dim", false).classed("connected", true);
-      });
-
-      // 5) Optionally, mark hovered node as "active" ONLY if it is one of the endpoints
-      // (prevents random tiers/zones from lighting up)
-      nodes.each(function (d) {
-        if (d.node.id === hoveredNode.id && showNodeIds.has(d.node.id)) {
-          d3.select(this)
-            .classed("active", true)
-            .classed("connected", false)
-            .classed("dim", false);
-        }
-      });
-    }
-
-    function highlight(nodeId) {
-      const lines = sceneG.selectAll("line.link");
-
-      // First dim everything
-      lines.classed("dim", true).classed("active", false);
-      sceneG
-        .selectAll("g.node")
-        .classed("dim", true)
-        .classed("active", false)
-        .classed("connected", false);
-
-      // Figure out which links touch this node (IMPORTANT: uses rendered link datum)
-      const connectedNodeIds = new Set([nodeId]);
-
-      lines.each(function (l) {
-        // l must have endpoints (either direct nodes or your snapped proxies)
-        // Support both: l._sp/_tp (proxy nodes) OR l.source/l.target (ids)
-        const sid = l._sp?.id ?? l.source;
-        const tid = l._tp?.id ?? l.target;
-
-        if (sid === nodeId || tid === nodeId) {
-          connectedNodeIds.add(sid);
-          connectedNodeIds.add(tid);
-
-          d3.select(this).classed("dim", false).classed("active", true);
-        }
-      });
-
-      // Highlight hovered node + its neighbors
-      sceneG.selectAll("g.node").each(function (d) {
-        const id = d.node.id;
-        if (!connectedNodeIds.has(id)) return;
-
-        d3.select(this)
-          .classed("dim", false)
-          .classed("active", id === nodeId)
-          .classed("connected", id !== nodeId);
-      });
-    }
-
-    // EXIT
     nodesSel.exit().transition().duration(150).style("opacity", 0).remove();
+
+    // Default state: no links shown
+    if (SHOW_LINKS_ONLY_ON_HOVER) clearLinks();
   }
 
   // Optional: click empty space to collapse everything
