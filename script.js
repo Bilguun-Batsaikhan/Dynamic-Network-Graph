@@ -6,6 +6,7 @@ const padding = 5; // extra padding between children and parent boundary
 const siblingPad = gap; // reuse your existing gap
 const SHOW_LINKS_ONLY_ON_HOVER = true;
 const MAX_HOVER_LINKS = 300; // cap to keep it snappy (tweak: 150..800)
+let linkEndpoints = []; // cached [{...link, _sh, _th}]
 
 let nodeById = new Map();
 
@@ -53,19 +54,56 @@ function toNode(t, parentPath = "", parent = null) {
     type: t.type,
     expanded: false,
     children: [],
-    parent, // ✅ add this
+    parent,
     r: rr,
     x: 0,
     y: 0,
     absX: 0,
     absY: 0,
+
+    // ✅ caches / metadata
+    depth: parent ? parent.depth + 1 : 0,
+    zone: parent?.zone ?? (t.type === "zone" ? t.name : null),
+    env: parent?.env ?? (t.type === "environment" ? t.name : null),
+
+    hostList: null, // Array<Node> (hosts)
+    hostSet: null, // Set<string> (host ids)
   };
+
   node.children = (t.children ?? []).map((ch) => toNode(ch, id, node));
   return node;
 }
 
+function buildHostCaches(node) {
+  // Leaf host
+  if (node.type === "host") {
+    node.hostList = [node];
+    node.hostSet = new Set([node.id]);
+    return node.hostSet;
+  }
+
+  const set = new Set();
+  const list = [];
+
+  if (node.children && node.children.length) {
+    node.children.forEach((c) => {
+      const childSet = buildHostCaches(c);
+      // merge sets
+      childSet.forEach((id) => set.add(id));
+
+      // merge lists
+      if (c.hostList) list.push(...c.hostList);
+    });
+  }
+
+  node.hostSet = set;
+  node.hostList = list;
+  return set;
+}
+
 const root = toNode(data);
 root.expanded = true; // show all security zones immediately
+buildHostCaches(root);
 
 // ---------- D3 setup ----------
 const container = d3.select("#viz");
@@ -179,6 +217,7 @@ function setup() {
   };
 
   // ---------- helpers ----------
+
   function computeAbsolutePositions(node, parentAbsX = 0, parentAbsY = 0) {
     node.absX = parentAbsX + (node.x ?? 0);
     node.absY = parentAbsY + (node.y ?? 0);
@@ -282,6 +321,14 @@ function setup() {
     computeAbsolutePositions(root, 0, 0);
 
     nodeById = indexAllNodes(root); // keep it current
+    linkEndpoints = links
+      .map((l) => {
+        const sh = nodeById.get(l.source);
+        const th = nodeById.get(l.target);
+        if (!sh || !th) return null;
+        return { ...l, _sh: sh, _th: th };
+      })
+      .filter(Boolean);
   }
 
   //   let nodeById = indexAllNodes(root);
@@ -316,45 +363,24 @@ function setup() {
       return cur;
     }
 
-    function collectHosts(node, out = []) {
-      if (!node) return out;
-      if (node.type === "host") out.push(node);
-      if (node.children) node.children.forEach((c) => collectHosts(c, out));
-      return out;
-    }
-
-    function hostIdsUnder(node) {
-      const ids = new Set();
-      collectHosts(node).forEach((h) => ids.add(h.id));
-      return ids;
-    }
-
     function computeResolvedLinksForHosts(hostIdSet) {
       if (!hostIdSet || hostIdSet.size === 0) return [];
 
-      // Filter FIRST (fast)
-      const filtered = links.filter(
+      const filtered = linkEndpoints.filter(
         (l) => hostIdSet.has(l.source) || hostIdSet.has(l.target),
       );
 
-      // Cap to avoid DOM spikes
       const capped =
         filtered.length > MAX_HOVER_LINKS
           ? filtered.slice(0, MAX_HOVER_LINKS)
           : filtered;
 
-      // Resolve endpoints + snap to visible proxies
       return capped
         .map((l) => {
-          const sh = nodeById.get(l.source);
-          const th = nodeById.get(l.target);
-          if (!sh || !th) return null;
-
-          const sp = visibleProxy(sh);
-          const tp = visibleProxy(th);
+          const sp = visibleProxy(l._sh);
+          const tp = visibleProxy(l._th);
           if (!sp || !tp) return null;
-
-          return { ...l, _sh: sh, _th: th, _sp: sp, _tp: tp };
+          return { ...l, _sp: sp, _tp: tp };
         })
         .filter(Boolean);
     }
@@ -394,7 +420,7 @@ function setup() {
     }
 
     function highlightHostsInSubtree(hoveredNode) {
-      const subtreeHostIds = hostIdsUnder(hoveredNode);
+      const subtreeHostIds = hoveredNode.hostSet ?? new Set();
 
       // If subtree has no hosts, clear and bail
       if (subtreeHostIds.size === 0) {
