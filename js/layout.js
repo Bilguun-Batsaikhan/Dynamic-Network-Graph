@@ -6,11 +6,18 @@ import { computeAbsolutePositions, indexAllNodes } from "./model.js";
 export function packWithPadding(circles, pad) {
   // Inflate radii so packing produces spacing.
   circles.forEach((c) => {
-    c.__r0 = c.r;
-    c.r = c.__r0 + pad / 2;
+    c.__r0 = c.r; // save original
+    c.r = c.__r0 + pad / 2; // inflated
   });
 
+  /**
+   * Takes an array of circles (each with a radius r)
+and assigns each one an x and y position
+so that no circles overlap and the layout is compact.
+   */
   d3.packSiblings(circles);
+  /**Computes the smallest possible enclosing circle
+that contains all given circles. Tells how big the parent must be */
   const enclosing = d3.packEnclose(circles);
 
   // Restore original radii (keep the packed x/y)
@@ -23,13 +30,14 @@ export function packWithPadding(circles, pad) {
 }
 
 export function computeRadius(node) {
+  // Leaf node
   if (!node.children || node.children.length === 0) {
     node.r = rr;
     return node.r;
   }
-
+  // Internal node: compute kids first so that packing can use their radii
   node.children.forEach(computeRadius);
-
+  // Collapsed node small radius
   if (!node.expanded) {
     node.r = rr;
     return node.r;
@@ -44,7 +52,7 @@ export function computeRadius(node) {
   node.r = Math.max(rr, enclosing.r + padding);
   return node.r;
 }
-
+// Positions the immediate children of an expanded node inside its circle, then recursively does the same for all descendants.
 export function layout(node) {
   if (!node.children || node.children.length === 0) return;
   if (!node.expanded) return;
@@ -56,8 +64,10 @@ export function layout(node) {
 
   // Fit the packed cluster inside the parent
   const targetR = Math.max(0, node.r - padding);
+  // scale children up or down so they fit perfectly inside the parent
   const scale = enclosing.r > 0 ? targetR / enclosing.r : 1;
-
+  /**children are positioned relative to the parent’s center
+coordinates are local (not absolute yet) */
   kids.forEach((c) => {
     c.x = (c.x - enclosing.x) * scale;
     c.y = (c.y - enclosing.y) * scale;

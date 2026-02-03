@@ -46,7 +46,9 @@ const zoom = d3
 svg.call(zoom).on("dblclick.zoom", null);
 svg.call(zoom.transform, getCenterTransform());
 
-// Initial recompute
+// Initial recompute, returns an object with at least 2 properties:
+// - nodeById: map of node.id → node
+// - linkEndpoints: array of link endpoint objects for rendering
 let { nodeById, linkEndpoints } = recomputeAll(root, links);
 
 // Config and colors
