@@ -42,11 +42,11 @@ export const data = {
   children: [
     "SZ-Internet",
     "SZ-DMZ",
-    "TPI",
-    "ISZ",
-    "Margherita",
-    "Private Cloud",
-    "Public Cloud",
+    "SZ-TPI",
+    "SZ-ISZ",
+    "SZ-Margherita",
+    "SZ-Private Cloud",
+    "SZ-Public Cloud",
   ].map((sz) => ({
     name: sz,
     type: "zone",

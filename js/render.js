@@ -19,6 +19,7 @@ export function render({
   colors,
   linkEndpoints,
   onToggleNode,
+  selection,
 }) {
   const {
     SHOW_LINKS_ONLY_ON_HOVER,
@@ -52,6 +53,7 @@ export function render({
     visibleIds,
     linkEndpoints,
     config: { SHOW_LINKS_ONLY_ON_HOVER, MAX_HOVER_LINKS },
+    sticky: true,
   });
 
   // ---- NODES join ----
@@ -64,15 +66,7 @@ export function render({
     .append("g")
     .attr("class", (d) => `node ${d.node.type}`)
     .attr("transform", (d) => `translate(${d.node.absX}, ${d.node.absY})`)
-    .style("cursor", "pointer")
-    .on("click", (event, d) => {
-      event.stopPropagation();
-      if (d.node.type === "root") return;
-
-      if (d.node.children && d.node.children.length > 0) {
-        onToggleNode(d.node);
-      }
-    });
+    .style("cursor", "pointer");
 
   nodesEnter
     .append("circle")
@@ -96,8 +90,37 @@ export function render({
   const nodesMerge = nodesEnter.merge(nodesSel);
 
   nodesMerge
-    .on("mouseenter", (event, d) => highlighter.onEnter(d.node))
-    .on("mouseleave", () => highlighter.onLeave());
+    .style("cursor", "pointer")
+    .on("click", (event, d) => {
+      event.stopPropagation();
+      if (d.node.type === "root") return;
+
+      selection.setSelectedNodeId(d.node.id);
+
+      // show highlight for current visibility snapshot
+      highlighter.onEnter(d.node);
+
+      applySelection(sceneG, selection.selectedNodeId);
+    })
+    .on("dblclick", (event, d) => {
+      event.stopPropagation();
+      if (d.node.type === "root") return;
+
+      selection.setSelectedNodeId(d.node.id);
+
+      if (d.node.children && d.node.children.length > 0) {
+        // expand/collapse triggers rerender; rerender will re-apply highlight
+        onToggleNode(d.node);
+      } else {
+        // leaf: highlight immediately
+        highlighter.onEnter(d.node);
+        applySelection(sceneG, selection.selectedNodeId);
+      }
+    });
+
+  // nodesMerge
+  //   .on("mouseenter", (event, d) => highlighter.onEnter(d.node))
+  //   .on("mouseleave", () => highlighter.onLeave());
 
   nodesMerge
     .transition()
@@ -128,16 +151,36 @@ export function render({
   nodesMerge.attr("class", (d) => `node ${d.node.type}`);
   nodesMerge.select("text").attr("y", (d) => d.node.r + 14);
 
+  applySelection(sceneG, selection.selectedNodeId);
+
+  const selected = visible.find((d) => d.node.id === selection.selectedNodeId);
+  if (selected) {
+    highlighter.onEnter(selected.node);
+  } else {
+    // if selected node is no longer visible, clear
+    highlighter.clear();
+  }
+
   nodesSel.exit().transition().duration(150).style("opacity", 0).remove();
 
-  // Default state: no links shown
-  if (SHOW_LINKS_ONLY_ON_HOVER) clearLinks();
+  // If nothing is selected, keep the default "no links" behavior.
+  // If something is selected, DO NOT clear, because click-selection is now the trigger.
+  if (SHOW_LINKS_ONLY_ON_HOVER && !selection?.selectedNodeId) {
+    clearLinks();
+  }
 }
 
 /**
  * Helper: Clear all links from the visualization
  */
+
 function clearLinks() {
   d3.selectAll("g.links").selectAll("line").remove();
   d3.selectAll("g.links").selectAll("text").remove();
+}
+
+function applySelection(sceneG, selectedNodeId) {
+  sceneG
+    .selectAll("g.node")
+    .classed("selected", (d) => d.node.id === selectedNodeId);
 }

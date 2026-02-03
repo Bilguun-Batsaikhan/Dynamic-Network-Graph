@@ -1,0 +1,31 @@
+/* Link lines and their interaction states */
+
+line.link {
+  stroke-width: 1;
+  opacity: 0.55;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Internal link = subtle */
+line.link.internal {
+  stroke: rgba(229, 231, 235, 0.65);
+}
+
+/* Cross-zone = attention (dashed + warmer) */
+line.link.cross-zone {
+  stroke: rgba(251, 191, 36, 0.95);
+  stroke-dasharray: 6 4;
+  stroke-width: 1px;
+  opacity: 0.85;
+}
+
+/* Hover states */
+line.link.dim {
+  opacity: 0.08;
+}
+
+line.link.active {
+  opacity: 1;
+  stroke-width: 1;
+}

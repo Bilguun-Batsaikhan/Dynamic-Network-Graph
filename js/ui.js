@@ -33,7 +33,14 @@ export function expandAll(node) {
   }
 }
 
-export function bindUI({ root, svg, zoom, onRecomputeAndRender, config }) {
+export function bindUI({
+  root,
+  svg,
+  zoom,
+  onRecomputeAndRender,
+  config,
+  getCenterTransform,
+}) {
   const { labelFontSizes, labelVisibility } = config;
 
   // Buttons
@@ -48,7 +55,8 @@ export function bindUI({ root, svg, zoom, onRecomputeAndRender, config }) {
   };
 
   document.getElementById("resetView").onclick = () => {
-    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+    const t = getCenterTransform ? getCenterTransform() : d3.zoomIdentity;
+    svg.transition().duration(500).call(zoom.transform, t);
   };
 
   // Label controls

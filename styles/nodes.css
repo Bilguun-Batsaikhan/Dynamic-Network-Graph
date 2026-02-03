@@ -1,0 +1,72 @@
+/* Node circle and text styling */
+
+.node circle {
+  stroke: #1f2937;
+  stroke-width: 2px;
+}
+
+/* Layer fills (transparent feel) */
+.node.root circle {
+  fill: rgba(255, 255, 255, 0); /* invisible container */
+  stroke: rgba(255, 255, 255, 0); /* hide stroke too */
+}
+
+.node.zone circle {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 3px;
+}
+
+.node.environment circle {
+  fill: rgba(52, 211, 153, 0.18);
+  stroke: rgba(52, 211, 153, 0.85);
+  stroke-width: 2.5px;
+}
+
+.node.tier circle {
+  fill: rgba(251, 191, 36, 0.16);
+  stroke: rgba(251, 191, 36, 0.8);
+}
+
+.node.application circle {
+  fill: rgba(167, 139, 250, 0.14);
+  stroke: rgba(167, 139, 250, 0.8);
+  stroke-dasharray: 5 3;
+}
+
+.node.host circle {
+  fill: rgba(229, 231, 235, 0.9);
+  stroke: rgba(15, 23, 42, 0.7);
+  stroke-width: 1.5px;
+}
+
+.node text {
+  fill: #e5e7eb;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Node interaction states */
+.node.dim circle,
+.node.dim text {
+  opacity: 0.15;
+}
+
+.node.active circle {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 4px;
+}
+
+.node.connected circle {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 3px;
+}
+
+.node.root circle {
+  cursor: pointer;
+}
+
+.node.selected circle {
+  stroke: rgba(255, 255, 255, 0.95) !important;
+  stroke-width: 5px !important;
+}

@@ -1,0 +1,13 @@
+/* Theme variables and base reset */
+
+:root {
+  --bg: #0b0f17;
+  --panel: #111827;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --stroke: #334155;
+}
+
+* {
+  box-sizing: border-box;
+}

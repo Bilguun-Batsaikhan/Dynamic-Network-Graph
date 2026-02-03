@@ -6,6 +6,7 @@ export function createHoverHighlighter({
   visibleIds,
   linkEndpoints,
   config,
+  sticky = false,
 }) {
   const { SHOW_LINKS_ONLY_ON_HOVER, MAX_HOVER_LINKS } = config;
 
@@ -136,6 +137,7 @@ export function createHoverHighlighter({
 
   return {
     onEnter: highlightHostsInSubtree,
-    onLeave: clearHighlight,
+    onLeave: sticky ? () => {} : clearHighlight,
+    clear: clearHighlight,
   };
 }

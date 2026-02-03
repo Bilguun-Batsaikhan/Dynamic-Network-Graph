@@ -1,0 +1,75 @@
+/* Legend and color swatches */
+
+.legend {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  user-select: none;
+}
+
+.legend-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.legend-gap {
+  height: 8px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  display: inline-block;
+}
+
+.swatch.zone {
+  background: rgba(96, 165, 250, 0.22);
+  border-color: rgba(96, 165, 250, 0.9);
+}
+
+.swatch.environment {
+  background: rgba(52, 211, 153, 0.18);
+  border-color: rgba(52, 211, 153, 0.85);
+}
+
+.swatch.tier {
+  background: rgba(251, 191, 36, 0.16);
+  border-color: rgba(251, 191, 36, 0.8);
+}
+
+.swatch.application {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: rgba(167, 139, 250, 0.8);
+}
+
+.swatch.host {
+  background: rgba(229, 231, 235, 0.9);
+  border-color: rgba(15, 23, 42, 0.7);
+}
+
+.line {
+  width: 20px;
+  height: 0;
+  border-top: 3px solid rgba(255, 255, 255, 0.6);
+  display: inline-block;
+}
+
+.line.cross {
+  border-top-style: dashed;
+  border-top-color: rgba(251, 191, 36, 0.95);
+}

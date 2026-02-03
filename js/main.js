@@ -20,6 +20,14 @@ const root = toNode(data);
 buildHostCaches(root);
 root.expanded = true;
 initZoneColors(root);
+let selectedNodeId = null;
+
+function getCenterTransform() {
+  const rect = svg.node().getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  return d3.zoomIdentity.translate(cx, cy).scale(1);
+}
 
 // Create SVG/viewport/scene
 const container = d3.select("#viz");
@@ -36,6 +44,7 @@ const zoom = d3
   });
 
 svg.call(zoom).on("dblclick.zoom", null);
+svg.call(zoom.transform, getCenterTransform());
 
 // Initial recompute
 let { nodeById, linkEndpoints } = recomputeAll(root, links);
@@ -61,7 +70,17 @@ const onToggleNode = (node) => {
     colors: renderColors,
     linkEndpoints,
     onToggleNode,
+    selection,
   });
+};
+// Selection state
+const selection = {
+  get selectedNodeId() {
+    return selectedNodeId;
+  },
+  setSelectedNodeId(id) {
+    selectedNodeId = id;
+  },
 };
 
 // Initial render
@@ -72,6 +91,7 @@ render({
   colors: renderColors,
   linkEndpoints,
   onToggleNode,
+  selection,
 });
 
 // Bind UI
@@ -84,10 +104,35 @@ const onRecomputeAndRender = () => {
     colors: renderColors,
     linkEndpoints,
     onToggleNode,
+    selection,
   });
 };
 
-bindUI({ root, svg, zoom, onRecomputeAndRender, config: renderConfig });
+bindUI({
+  root,
+  svg,
+  zoom,
+  onRecomputeAndRender,
+  config: renderConfig,
+  getCenterTransform,
+});
+
+// Clear selection on background click
+svg.on("click", (event) => {
+  if (event.defaultPrevented) return;
+  selectedNodeId = null;
+  // rerender so links/nodes clear
+  ({ nodeById, linkEndpoints } = recomputeAll(root, links));
+  render({
+    sceneG: g,
+    root,
+    config: renderConfig,
+    colors: renderColors,
+    linkEndpoints,
+    onToggleNode,
+    selection,
+  });
+});
 
 // Resize listener
 window.addEventListener("resize", () => {
